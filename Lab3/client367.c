@@ -11,267 +11,229 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <ctype.h>
 
 #include <arpa/inet.h>
 
-#define PORT "3490" // the port client will be connecting to 
+#define PORT "3527" // the port client will be connecting to
 
-#define MAXDATASIZE 256 // max number of bytes we can get at once 
-#define MAX_NUM 256
+#define MAXDATASIZE 100 // max number of bytes we can get at once
+
 // get sockaddr, IPv4 or IPv6:
-void *get_in_addr(struct sockaddr *sa)
-{
-	if (sa->sa_family == AF_INET) {
-		return &(((struct sockaddr_in*)sa)->sin_addr);
-	}
-
-	return &(((struct sockaddr_in6*)sa)->sin6_addr);
+void *get_in_addr(struct sockaddr *sa) {
+    if (sa->sa_family == AF_INET) {
+        return &(((struct sockaddr_in *) sa)->sin_addr);
+    }
+    return &(((struct sockaddr_in6 *) sa)->sin6_addr);
 }
 
-int main(int argc, char *argv[])
-{
-int sockfd, numbytes;  
-char buf[MAXDATASIZE];
-char tempbuf[MAXDATASIZE];
-struct addrinfo hints, *servinfo, *p;
-int rv,conn;
-char s[INET6_ADDRSTRLEN];
-char cmdbuf[MAX_NUM]={0};        
-char sedbuf[MAX_NUM]={0};
-char revbuf[MAX_NUM]={0};
-char fname[MAX_NUM]={0};
-char dload[MAX_NUM]={0};
-char * buftoken;
-FILE *fp;        
-int i;
-int flag;
-if (argc != 2) 
-{
-	fprintf(stderr,"usage: client hostname\n");
-	exit(1);
-}
+int main(int argc, char *argv[]) {
+    int sockfd, numbytes;
+    char buf[MAXDATASIZE];
+    struct addrinfo hints, *servinfo, *p;
+    int rv;
+    char s[INET6_ADDRSTRLEN];
+    char cmd = 't';          //user command input storage
 
-while(1)
-{
-	memset(&hints, 0, sizeof hints);
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_STREAM;
+    //  while(cmd != 'q'){/////////////////////////while loop//////////////////
+    //    printf("whats your input?\n");
+    //    scanf("%c",cmd);
+    //  printf("%c\n",cmd);
 
-	if ((rv = getaddrinfo(argv[1], PORT, &hints, &servinfo)) != 0) {
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-		return 1;
-	}
+    if (argc != 2) {
+        fprintf(stderr, "usage: client hostname\n");
+        exit(1);
+    }
 
-	// loop through all the results and connect to the first we can
-	for(p = servinfo; p != NULL; p = p->ai_next) {
-		if ((sockfd = socket(p->ai_family, p->ai_socktype,
-				p->ai_protocol)) == -1) {
-			perror("client: socket");
-			continue;
-		}
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    while (cmd != 'q') {
+        if ((rv = getaddrinfo(argv[1], PORT, &hints, &servinfo)) != 0) {
+            fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+            return 1;
+        }
 
-		if (conn=connect(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
-			close(sockfd);
-//              printf("Test for connect()=%d\n",conn);
-			perror("client: connect");
-			continue;
-		}
-                else
-		{
-	        // printf("client: For test: connect() is successful,conn=%d\n",conn);
-		printf("\n");
-		}
-		break;
-	}
+        // loop through all the results and connect to the first we can
+        for (p = servinfo; p != NULL; p = p->ai_next) {
+            if ((sockfd = socket(p->ai_family, p->ai_socktype,
+                                 p->ai_protocol)) == -1) {
+                perror("client: socket");
+                continue;
+            }
 
-	if (p == NULL) {
-		fprintf(stderr, "client: failed to connect\n");
-		return 2;
-	}
+            if (connect(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
+                close(sockfd);
+                perror("client: connect");
+                continue;
+            }
 
-	inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr),
-			s, sizeof s);
-//	printf("client: connecting to %s\n", s);
+            break;
+        }
+
+        if (p == NULL) {
+            fprintf(stderr, "client: failed to connect\n");
+            return 2;
+        }
+
+        inet_ntop(p->ai_family, get_in_addr((struct sockaddr *) p->ai_addr),
+                  s, sizeof s);
+        printf("client: connecting to %s\n", s);
+
+        char filename[MAXDATASIZE];
         freeaddrinfo(servinfo); // all done with this structure
 
-//------send data to server----------
-	printf("Client: Input Command please:\n");
-	fgets(cmdbuf,MAX_NUM,stdin); // command stores in sefbuf[]
+        //  while(cmd != 'q'){ //////////////////////////////////while loop/////                   /////////////
+        printf("............Welcome to the MC Command Hub.............\n");
+        printf("Please input your command........'input: h for help'..\n");
+        scanf("%c", &cmd);
+        while (getchar() != '\n') continue;
+        if (cmd == 'h') {
+            printf("Please make your selection from the following commands\n");
+            printf("'l' = List contents of server.....ex(l)...............\n");
+            printf("'c' = Check for a file name.......ex(c <filename>)....\n");
+            printf("'d' = Download file name..........ex(d <filename>)....\n");
+            printf("'p' = Display file name...........ex(p <filename>)....\n");
+            printf("'q' = Quit............................................\n");
+        }
+        ///////////////check for commands//////////////////////////
+        if (cmd == 'l') {
 
-//----------list-0----------------------
-	if(strncmp(cmdbuf,"list",4)==0)
-	{
-		if(send(sockfd, cmdbuf,4,0)==-1)
-		{
-			printf("client send error!!!\n");
-		}
-                
-		if ((numbytes = recv(sockfd, buf, MAXDATASIZE-1, 0)) == -1) 
-		{ // received   store in buf
-			perror("recv");
-			exit(1);
-		}
-		buf[numbytes] = '\0';// must included this line
-		printf("Client lists the files:\n");
-		printf("%s\n",buf);
-		memset(buf,0,256);
-	}
+            send(sockfd, "list", 4, 0);
+            //{//
+            //perror("send");
+            //close(sockfd);
+            //exit(0);
+            //}
+            numbytes = recv(sockfd, buf, MAXDATASIZE - 1, 0);
+            buf[numbytes] = '\0';
+            printf("%s\n", buf);
+        }
+        if (cmd == 'c') {
+            char ans[3];
+            int numb;
+            send(sockfd, "chek", 4, 0);
+            printf("Which file do you want to check for?:\n");
+            scanf("%s", &filename);
+            while (getchar() != '\n') continue;
 
-//---------check-1----------------------
-	else if(strncmp(cmdbuf,"check",5)==0)
-	{
-		printf("Input file name:\n");//print...............................
-                 // fgets(fname,MAX_NUM,stdin);
-		scanf("%s",fname);
-		strcpy(sedbuf,"check,");
-		strcat(sedbuf,fname);
-         	if(send(sockfd, sedbuf, strlen(sedbuf),0)==-1)
-		{
-			printf("Client:client send error!!\n");
-		}
-		
-		if ((numbytes = recv(sockfd, buf, MAXDATASIZE-1, 0)) == -1) 
-		{
-			perror("recv");
-			exit(1);
-		}
+            //Sending filename to server
+            send(sockfd, filename, MAXDATASIZE, 0);
+            numb = recv(sockfd, buf, MAXDATASIZE - 1, 0);
+            buf[numb] = '\0';
 
-		buf[numbytes] = '\0';
-		printf("Client checks file:'%s'\n",buf);
-		memset(buf,0,256);
-             }
+            if (!strcmp(buf, "yes"))
+                printf("File was found\n");
+            else
+                printf("File was not found\n");
 
-//------------display-2-------------------
-	else if(strncmp(cmdbuf,"display",7)==0)
-	{
-		printf("Input the file name:\n");
-		// fgets(fname,MAX_NUM,stdin);
-		scanf("%s",fname);
-		strcpy(sedbuf,"display,");
-		strcat(sedbuf,fname);
 
-		if(send(sockfd,sedbuf,strlen(sedbuf),0)==-1)
-		{
-			printf("Client send error!!\n");
-		}
-		numbytes=recv(sockfd,buf,MAXDATASIZE-1,0);
-		if(numbytes==-1)
-		{
-			perror("recv");
-			exit(1);
-		}
-		else
-		{
-			printf("Client displays file:\n");
-			while(numbytes==255)
-			{
-				buf[numbytes]='\0';
-				printf("%s",buf);
-				numbytes = recv(sockfd,buf,MAXDATASIZE-1,0);
-			}
- 
-			memcpy(tempbuf,buf,numbytes);
-			printf("%s",tempbuf);
-			memset(tempbuf,0,256);
-			memset(buf,0,256);
-		}
-	}
- 
-//---------------download-3----------------
-	else if(strncmp(cmdbuf,"download",8)==0)
-	{
-		printf("Input the file name:\n");
-		scanf("%s",fname);
-		strcpy(sedbuf,"display,");
-		strcat(sedbuf,fname);
-                    
-		if(send(sockfd,sedbuf,strlen(sedbuf),0)==-1)
-		{ printf("client send error!!!\n");}
+        }
 
-		numbytes=recv(sockfd,buf,MAXDATASIZE-1,0);
-		
-		if(numbytes==-1)
-		{
-			perror("recv");
-			exit(1);
+        if (cmd == 'p') // display function
+        {
+
+
+            send(sockfd, "disp", 50, 0); //send server cmd input
+            printf("enter file name: \n"); //client side file name
+            scanf("%s", &filename);
+            int filesize;
+            char sizeofFile[20] = {0};
+            send(sockfd, filename, 100, 0); //receive server file string
+            numbytes = recv(sockfd, sizeofFile, 20, 0); // Receive back the file size from server
+            filesize = (int) strtol(sizeofFile, (char **) NULL, 10); //Change the  chars the server sent us back to int
+            printf("Size file: %d \n", filesize);
+            if (filesize == 0) {
+                printf("File not found"); // 0 indicates file not found
+                continue;
+            } else {
+                char *filebuff = calloc(filesize + 1, sizeof(char)); //Allocate char rray of file size
+                sleep(1);
+                numbytes = recv(sockfd, filebuff, filesize, 0); // Receive file  to allocated array
+                printf("contents : \n%s", filebuff); // debug
+              /*  printf("Save as: "); //client side filename
+                scanf("%s", &filename);
+                //download file from server
+                FILE *fp;
+                fp = fopen(filename, "r");
+                if (fp != NULL) {
+                    char choice[5];
+                    printf("File %s exist. Do you want to override? (y/n): ", filename); //client side filename
+                    scanf("%4s", &choice);
+                    if (tolower(choice[0]) == 'n') {
+                        fclose(fp); // Close file
+                        free(filebuff); // Free allocated buffer
+                        continue;
+                    }
+                }
+                // fp is null, write file
+                fp = fopen(filename, "w");
+                if (NULL == fp) {
+                    printf("error opening file");
+                    return 1;
+                }
+                fwrite(filebuff, 1, filesize, fp); // Write filesize # of bytes to fp
+                fclose(fp); // Close file
+                free(filebuff); // Free allocated buffer
+*/
+            }
+           // close(sockfd);
+        }
+
+	if(cmd == 'd'){
+		send(sockfd, "disp", 50, 0); //send server cmd input
+		printf("Enter File Name: \n"); //client side file name
+		scanf("%s", &filename);
+		int filesize;
+		char sizeofFile[20] = {0};
+		send(sockfd, filename, 100, 0); //receive server file string
+		numbytes = recv(sockfd, sizeofFile, 20, 0); //Receive back the file size from server
+		filesize = (int) strtol(sizeofFile, (char **) NULL, 10); //change chars the sever sent to int
+		printf("File Size: %d \n", filesize);
+		if(filesize == 0){
+			printf("File Not Found");
+			continue;
 		}
-		buf[numbytes] = '\0'; 
-		flag=strncmp("File is not found!",buf,18);
-		
-		
-		if(flag==0)
-		{
-			printf("%s",buf);    
-		}
-		
-		else if((fp=fopen(fname,"r"))!=NULL) 
-         	{
-			printf("File '%s' exists. Overwrite it? (y/n)\n", fname);
-			char check[MAX_NUM]={0};
-			scanf("%s",check);
-//			printf("ct33:%s\n",check);
-			char checkflagchar= check[0];
-//			printf("ct34:checkflagchar='%d'\n",checkflagchar);
-			
-			if(checkflagchar == 'y') 
-			{
-				fp = fopen(fname,"w");
-				fprintf(fp,"%s",buf);
-				while(numbytes=recv(sockfd,buf,255,0)) 
-				{
-					buf[numbytes] = '\0';
-					fprintf(fp,"%s",buf);
+		else {
+			char *filebuff = calloc(filesize+1, sizeof(char)); //Allocate char array of file size
+			sleep(1);
+			numbytes = recv(sockfd, filebuff, filesize, 0); //Receive file to allocated array
+			printf("File Downloaded from Server\n");
+			printf("Save as: "); //client side filename
+			scanf("%s", &filename);
+
+			//download file from server
+			FILE *fp;
+			fp = fopen(filename, "r");
+			if(fp != NULL){
+				char choice[5];
+				printf("File %s exists. Do you want to override? (y/n): ", filename);
+				scanf("%4s", &choice);
+				if(tolower(choice[0]) == 'n'){
+					fclose(fp);
+					free(filebuff);
+					continue;
 				}
-				fclose(fp);
-				printf("1:Download of file '%s' complete\n",fname);
-			}	
-	      		else if(checkflagchar == 'n'){printf("Aborted!\n");}	
-	      		else{printf("You must input y or x.  You are not supposed to input %c\n",checkflagchar);}
-		}
-
-		else 
-		{
-			fp = fopen(fname,"w");
-			fprintf(fp,"%s",buf);
-			while(numbytes=recv(sockfd,buf,MAXDATASIZE-1,0))
-			{
-				buf[numbytes] = '\0';
-				fprintf(fp,"%s",buf);
 			}
+
+			//Write file
+			fp = fopen(filename, "w");
+			if(NULL == fp){
+				printf("Error Opening File");
+				return 1;
+			}
+			fwrite(filebuff, 1, filesize, fp);
 			fclose(fp);
-			printf("2:Download of file '%s' complete\n",fname);
-		} 		  
-	}  // end if
-
-
-//-------------quit-4--------------
-	else if (strncmp(cmdbuf,"quit",4)==0)
-	{
-		printf("Quit!\n");      
-		exit(0);
+			free(filebuff);
+		}
+		//close(sockfd);
 	}
 
+        if (cmd == 'q') {
+            break;
+        }
+    }////////while loop///////////////////////////
+    close(sockfd);
 
-//------------help--------------------
-	else if(strncmp(cmdbuf,"help",4)==0)
-	{
-		printf("How to use command\n");
-		printf("Input 'list'    : list the content of server\n");
-		printf("Input 'check'   : check if the server has the file named <file name>\n");
-		printf("Input 'display' : display contents of file\n");
-		printf("Input 'download':download file <file name>\n");
-		printf("Input 'help'    : Get help!\n");
-		printf("Input 'quit'    : Quit!!\n");
-         } 
-
-	 else
-	 {
-	 	printf("Please input help to get support.\n");
-	 
-	 }
-//-------------end!!!--------------
-//break; // for test!
-} // close while
-close(sockfd);
-return 0;
-} // close main
+    return 0;
+}
